@@ -3,42 +3,26 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <math.h>
+#include <windows.h>
 
-// #include "../includes/scr.h"
-// #include "../includes/files.h"
 #include "../includes/params.h"
 #include "../includes/files.h"
+#include "../includes/utils.h"
 
 int main(int nbArg, char **args)
 {
-   // ****************************
-   //     Parametres
-   // ****************************
 
-
-//    int width, height; // width = nb octect height=nb ligne
-//    width = 16; //4;
-//    height = 30; //16;
-//    unsigned char tile[64*128];
- //  char path[50] = "flag.SCR";
-//    //                           tiles              cursor,void  border       padlocks          keym,key showm,show 
-//   // unsigned char listTiles[] = {8,9,10,11,12,13, 0,0, 14, 7, 0,1,2,3,4,5,6, 17,18,19,20,21,22, 15,16, 23,24};
-//    unsigned char listTiles[] = {0,1};
-//   // int nbTile=7;
-
+   SetConsoleOutputCP(65001);
 
    Params params = {0}; // mets a zero ou nul la structure
-   
-//    params.width=width;
-//    params.height=height;
 
    GetParametersFromCommandLine(nbArg,args,&params);
    
    // printf("name : %s",params.outputFilename);
 
    if (params.filename == 0) {
-      printf("\nno file");
-      return 1;
+      printf("\nNo file");
+      return 0;
    }   
 
 
@@ -53,12 +37,12 @@ int main(int nbArg, char **args)
 
     // Afficher la taille du fichier
     printf("\nLa taille du fichier est : %ld octets\n", fileStat.st_size);
-   
+   params.sizeFile = fileStat.st_size;
 
 //    // gestion fichier
-   unsigned char binaryFile[fileStat.st_size];
+   unsigned char binaryFile[params.sizeFile];
    
-   readBin(params.filename, binaryFile, fileStat.st_size);
+   readBin(params.filename, binaryFile, params.sizeFile);
 
 
    // Affiche le contenu du binaire 
@@ -71,8 +55,7 @@ int main(int nbArg, char **args)
    // }
 
 
-   // sauvegarde du sd 
-//    int lenghtTiles = sizeof(listTiles) *params.width*params.height;
+   // création du sd 
 
    char dataSd[1024*512] = {0}; // initialise la SD
 
@@ -87,100 +70,83 @@ int main(int nbArg, char **args)
    // 1 Octet = Type Caractere (‘B’=basic, ‘M’=code machine, ‘S’=écran)
    // 1 Octet = Taille en cluster
 
-   strcpy(dataSd+0,"TESTSD");
+   strcpy(dataSd+0,"A");
    dataSd[0+6]=0x0;
-   dataSd[0+7]=0x01;
+   dataSd[0+7]=0x01; // Ici le départ est le 1er cluster
    dataSd[0+8]='M';
-   dataSd[0+9]=0x01;
+
+   // Calcul le nombre de cluster pour le fichier
+   // 1 Cluster  = 2 secteurs de 512 Octets = 1024
+   // Le début du 1er cluster contient un entête de 13 octets 
+   
+   
+   int totalCluster = floor((params.sizeFile - (1024-13))/1024)+1+1;
+   printf("\nCluster : %d",totalCluster);
+   dataSd[0+9]=totalCluster;
 
 
 
    // 510-511 2 octets pour le checksum   
 
-   // calcul le checkSum
+   // calcul le checkSum, c'est l'addition de tout les octets du secteur repertoire sans le label disque
+   
    int checkSum = 0;
    for (int i=0 ; i<500 ; i++){
       checkSum += dataSd[i];
    }
    printf("\ncheckSum : %d",checkSum);
 
-   // Ecrire le checksum 
-   // Poids fort
-   int poidFort = floor(checkSum/256) ;
-   int poidFaible = checkSum - (poidFort*256);
-   dataSd[511] = poidFort;
-   dataSd[510] = poidFaible;
+   // Ecrire le checksum
+   littleEndian16(checkSum,dataSd+0x510);
+
+   // int poidFort = floor(checkSum/256) ;
+   // int poidFaible = checkSum - (poidFort*256);
+   // dataSd[511] = poidFort;
+   // dataSd[510] = poidFaible;
    
 
-   dataSd[512]=0xFF; // Cluster 0 occupé
-
+   // Définition de la talble d'allocation des fichiers 
+   dataSd[0x200] = 0xFF; // Cluster 0 occupé
+   for (int i=0; i<totalCluster ; i++){
+      if (totalCluster==1 && i==0){
+         dataSd[0x200+1+i] = 1;
+      }else if (i<totalCluster && i!=(totalCluster-1)){
+         dataSd[0x200+1+i] = i+2;
+      }else if(i!=(totalCluster-1)){
+         dataSd[0x200+1+i] = totalCluster; 
+      }
+   }
 
    // Copy binaire
 
-   dataSd[0x400] = 0x00;
-   dataSd[0x401] = 0x50;
-   dataSd[0x402] = 0x5B;
-   dataSd[0x403] = 0x00;
+   printf("\nAdress Start");
+   littleEndian16(params.adressStart,dataSd+0x400);
+
+   printf("\nSize File");
+   littleEndian16(params.sizeFile,dataSd+0x402);
+   
    dataSd[0x404] = 0x00;
    dataSd[0x405] = 0x00;
    dataSd[0x406] = 0x00;
    dataSd[0x407] = 0x00;
    dataSd[0x408] = 0x00;
-   dataSd[0x409] = 0x00;
-   dataSd[0x40A] = 0x50;
-   dataSd[0x40B] = 0x01;
-   dataSd[0x40C] = 0x2F;
-   
-   for (int i=0 ; i<0x5b+1 ; i++){
-      dataSd[0x40D+i] = binaryFile[i];
+
+   printf("\nAdress Exec");
+   littleEndian16(params.adressExec,dataSd+0x409);
+
+   printf("\nChecksum File : %2.2X",checkSumFile(binaryFile,sizeof(binaryFile)));
+   littleEndian16(checkSumFile(binaryFile,sizeof(binaryFile)) , dataSd+0x40B );
+
+   // Copie les datas à partir du 1er cluster $400
+   int adressCluster = 0x400;      
+
+   for (int i=0 ; i<params.sizeFile ; i++){
+      dataSd[adressCluster+i] = binaryFile[i];
    }
    
-   
+   // Sauvegarde le fichier SD
+
    saveSd(params.outputFilename,dataSd,sizeof(dataSd));
 
-
-
-
-
-// ***********************************************
-
-
-//    // recupere la 1er tiles en haut a gauche
-
-//    //printf("debut : \n");
-   
-//    unsigned char *pt = tile;
-//    int colum,line;
-//    colum = 0 ;
-//    line = 0 ;
-
-//    for (int i = 0; i < sizeof(listTiles); i++)
-//    {
-//       int currentTile = listTiles[i];
-//       int nbTileInColum = 200/params.height;
-//       colum = currentTile/nbTileInColum;
-//       line = currentTile % nbTileInColum;
-
-//       for (int l = 0 ; l < params.height ; l++)
-//       {  
-//          for (int c = 0 ; c < params.width ; c++)
-//          {
-//             unsigned char t = cells[(c+colum*params.width) +80*(l+line*params.height)];
-//             *pt = t;
-//             pt++; 
-//          }
-//       }
-//       //  line++;
-//    }
-//   // printf("tile : %d\n",tile);
-//   // printf("%d\n",sizeof(tile));
-
-//    // sauvegarde le fichier binaire
-// //   return 0;
-
-//    char name[50] = "flags.bin"; //"AllTiles.bin";
-//    int lenghtTiles = sizeof(listTiles) *params.width*params.height;
-//    saveBin(name,tile,lenghtTiles);
-// //    //
    return 0;
 }

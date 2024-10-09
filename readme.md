@@ -14,7 +14,7 @@ Ecrit en C avec GCC
 
     -b binary file      : Permet de charger un fichier binaire
     -e adresse Exec     : Permet de définir l'adresse d'execution du binaire
-    -i                  : Info sur les commandes et le programme
+    -h                  : Info sur les commandes et le programme
     -o output file      : Permet de définir le nom du fichier SD
     -s address Start    : Permet de définir l'adresse de départ du binaire
 
