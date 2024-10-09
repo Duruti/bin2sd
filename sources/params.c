@@ -51,7 +51,12 @@ int parseOption(char **argv,Params *parameter)
          case 'H':
             {  
                printf("\n Version %s",Version);
-               printf("\n-b binary file      : Permet de charger un fichier binaire\n-e adresse Exec     : Permet de définir l'adresse d'execution du binaire\n-h                  : Info sur les commandes et le programme\n-o output file      : Permet de définir le nom du fichier SD\n-s address Start    : Permet de définir l'adresse de départ du binaire");
+               printf("\n-b name binary file : Permet de charger un fichier binaire");
+               printf("\n-e adresse Exec     : Permet de définir l'adresse d'execution du binaire");
+               printf("\n-h                  : Info sur les commandes et le programme");
+               printf("\n-o name output file : Permet de définir le nom du fichier SD");
+               printf("\n-s address Start    : Permet de définir l'adresse de départ du binaire");
+               printf("\n");
                break;
             }
          case 'o':
