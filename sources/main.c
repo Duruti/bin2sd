@@ -97,7 +97,7 @@ int main(int nbArg, char **args)
    printf("\ncheckSum : %d",checkSum);
 
    // Ecrire le checksum
-   littleEndian16(checkSum,dataSd+0x510);
+   littleEndian16(checkSum,dataSd+510);
 
    // int poidFort = floor(checkSum/256) ;
    // int poidFaible = checkSum - (poidFort*256);
@@ -138,7 +138,7 @@ int main(int nbArg, char **args)
    littleEndian16(checkSumFile(binaryFile,sizeof(binaryFile)) , dataSd+0x40B );
 
    // Copie les datas à partir du 1er cluster $400
-   int adressCluster = 0x400;      
+   int adressCluster = 0x400+13;      
 
    for (int i=0 ; i<params.sizeFile ; i++){
       dataSd[adressCluster+i] = binaryFile[i];
